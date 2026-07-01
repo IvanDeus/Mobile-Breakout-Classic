@@ -1,0 +1,11 @@
+<div class="game-wrapper">
+  <canvas
+    #gameCanvas
+    class="game-canvas"
+    (click)="onCanvasClick()"
+    (mousemove)="onMouseMove($event)"
+    (touchstart)="onTouchStart($event)"
+    (touchmove)="onTouchMove($event)"
+    (touchend)="onTouchEnd($event)"
+  ></canvas>
+</div>
