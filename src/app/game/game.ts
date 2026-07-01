@@ -21,22 +21,23 @@ interface Ball {
   vx: number; vy: number;
 }
 
-// Canvas sizing constants
-const CANVAS_W = 800;
+// Canvas sizing constants – fixed 360×600 portrait mobile
+const CANVAS_W = 360;
 const CANVAS_H = 600;
 
-// Brick constants
-const BRICK_W = 60;
-const BRICK_H = 20;
-const BRICK_PADDING = 10;
+// Brick constants – 7 columns fitting 360 px width
+const BRICK_COLS = 7;
+const BRICK_W = 40;
+const BRICK_H = 16;
+const BRICK_PADDING = 6;
 const BRICK_OFFSET_TOP = 60;
-const BRICK_OFFSET_LEFT = 30;
+const BRICK_OFFSET_LEFT = (CANVAS_W - BRICK_COLS * (BRICK_W + BRICK_PADDING) + BRICK_PADDING) / 2;
 
 // Gameplay constants
-const BASE_PADDLE_W = 100;
-const BASE_BALL_SPEED = 4;
-const MAX_BALL_SPEED = 10;
-const MAX_PADDLE_W = 250;
+const BASE_PADDLE_W = 70;
+const BASE_BALL_SPEED = 3.5;
+const MAX_BALL_SPEED = 8;
+const MAX_PADDLE_W = 150;
 const BONUS_DURATION_MS = 5000;
 
 @Component({
@@ -66,8 +67,8 @@ export class GameComponent implements AfterViewInit, OnDestroy {
   private animFrameId = 0;
 
   // Game objects
-  private paddle: Paddle = { x: 350, y: 570, w: BASE_PADDLE_W, h: 10, prevX: 350, vx: 0 };
-  private ball: Ball = { x: 400, y: 300, r: 8, vx: BASE_BALL_SPEED, vy: -BASE_BALL_SPEED };
+  private paddle: Paddle = { x: CANVAS_W / 2 - BASE_PADDLE_W / 2, y: 570, w: BASE_PADDLE_W, h: 10, prevX: CANVAS_W / 2 - BASE_PADDLE_W / 2, vx: 0 };
+  private ball: Ball = { x: CANVAS_W / 2, y: CANVAS_H / 2, r: 7, vx: BASE_BALL_SPEED, vy: -BASE_BALL_SPEED };
   private bricks: Brick[] = [];
 
   // Bonus timers
@@ -150,22 +151,23 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.shadowColor = '#a78bfa';
     ctx.shadowBlur = 20;
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 48px "Inter", sans-serif';
+    ctx.font = 'bold 36px "Inter", sans-serif';
     ctx.fillText('BREAKOUT', CANVAS_W / 2, 170);
     ctx.shadowBlur = 0;
-    ctx.font = '20px "Inter", sans-serif';
+    ctx.font = '16px "Inter", sans-serif';
     ctx.fillStyle = '#a78bfa';
-    ctx.fillText('CLASSIC', CANVAS_W / 2, 200);
+    ctx.fillText('CLASSIC', CANVAS_W / 2, 196);
 
     // Hi Score & Last Level
-    ctx.font = '17px "Inter", sans-serif';
+    ctx.font = '15px "Inter", sans-serif';
     ctx.fillStyle = '#fbbf24';
-    ctx.fillText(`🏆 Hi Score: ${this.hiScore()}`, CANVAS_W / 2, 268);
+    ctx.fillText(`🏆 Hi Score: ${this.hiScore()}`, CANVAS_W / 2, 260);
     ctx.fillStyle = '#94a3b8';
-    ctx.fillText(`📊 Last Level: ${this.lastLevel()} / ${this.totalLevels}`, CANVAS_W / 2, 298);
+    ctx.fillText(`📊 Last Level: ${this.lastLevel()} / ${this.totalLevels}`, CANVAS_W / 2, 288);
 
     // Start button
-    const bx = CANVAS_W / 2 - 110, by = 340, bw = 220, bh = 54;
+    const bw = 200, bh = 50;
+    const bx = CANVAS_W / 2 - bw / 2, by = 330;
     const btnGrad = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
     btnGrad.addColorStop(0, '#7c3aed');
     btnGrad.addColorStop(1, '#a855f7');
@@ -178,27 +180,28 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 22px "Inter", sans-serif';
-    ctx.fillText('TAP TO PLAY', CANVAS_W / 2, 375);
+    ctx.font = 'bold 20px "Inter", sans-serif';
+    ctx.fillText('TAP TO PLAY', CANVAS_W / 2, 362);
 
     // Controls hint
     ctx.fillStyle = '#64748b';
-    ctx.font = '14px "Inter", sans-serif';
-    ctx.fillText('Mouse or Touch to control paddle', CANVAS_W / 2, 430);
-    ctx.fillText('Break bricks • Collect bonuses • Beat 10 levels', CANVAS_W / 2, 455);
+    ctx.font = '12px "Inter", sans-serif';
+    ctx.fillText('Touch to control paddle', CANVAS_W / 2, 420);
+    ctx.fillText('Break bricks • Collect bonuses', CANVAS_W / 2, 440);
+    ctx.fillText('Beat 10 levels', CANVAS_W / 2, 460);
     ctx.textAlign = 'left';
   }
 
   private drawMenuBricks(ctx: CanvasRenderingContext2D): void {
     const colors = ['#22c55e', '#f97316', '#3b82f6', '#d946ef', '#fbbf24'];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 6; i++) {
       ctx.globalAlpha = 0.12;
       ctx.fillStyle = colors[i % colors.length];
-      const bx = 60 + i * 90;
+      const bx = 30 + i * 55;
       ctx.beginPath();
-      ctx.roundRect(bx, 80, 60, 20, 4);
+      ctx.roundRect(bx, 80, 40, 16, 4);
       ctx.fill();
-      ctx.roundRect(bx + 20, 520, 60, 20, 4);
+      ctx.roundRect(bx + 10, 530, 40, 16, 4);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -212,8 +215,8 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.gameWon.set(false);
     this.isNewHiScore.set(false);
     this.gameState.set('playing');
-    this.paddle = { x: 350, y: 570, w: BASE_PADDLE_W, h: 10, prevX: 350, vx: 0 };
-    this.ball = { x: 400, y: 300, r: 8, vx: BASE_BALL_SPEED, vy: -BASE_BALL_SPEED };
+    this.paddle = { x: CANVAS_W / 2 - BASE_PADDLE_W / 2, y: 570, w: BASE_PADDLE_W, h: 10, prevX: CANVAS_W / 2 - BASE_PADDLE_W / 2, vx: 0 };
+    this.ball = { x: CANVAS_W / 2, y: CANVAS_H / 2, r: 7, vx: BASE_BALL_SPEED, vy: -BASE_BALL_SPEED };
     clearTimeout(this.speedBonusTimer);
     clearTimeout(this.paddleBonusTimer);
     this.speedBonusExpiry = 0;
@@ -419,11 +422,11 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.speedBonusExpiry = 0;
     this.paddleBonusExpiry = 0;
     this.paddle.w = BASE_PADDLE_W;
-    this.paddle.x = 350;
+    this.paddle.x = CANVAS_W / 2 - BASE_PADDLE_W / 2;
     this.paddle.prevX = this.paddle.x;
     this.paddle.vx = 0;
-    this.ball.x = 400;
-    this.ball.y = 300;
+    this.ball.x = CANVAS_W / 2;
+    this.ball.y = CANVAS_H / 2;
     const lvlSpeed = BASE_BALL_SPEED + (this.level() - 1) * 0.3;
     this.ball.vx = lvlSpeed;
     this.ball.vy = -lvlSpeed;
@@ -450,19 +453,19 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     // HUD - Score
     ctx.textAlign = 'left';
     ctx.fillStyle = '#e2e8f0';
-    ctx.font = 'bold 18px "Inter", sans-serif';
-    ctx.fillText('Score: ' + this.score(), 14, 28);
+    ctx.font = 'bold 15px "Inter", sans-serif';
+    ctx.fillText('Score: ' + this.score(), 10, 24);
 
     // HUD - Hi Score
     ctx.fillStyle = '#fbbf24';
-    ctx.font = '14px "Inter", sans-serif';
-    ctx.fillText('🏆 ' + this.displayHiScore(), 14, 48);
+    ctx.font = '12px "Inter", sans-serif';
+    ctx.fillText('🏆 ' + this.displayHiScore(), 10, 42);
 
     // HUD - Level
     ctx.textAlign = 'center';
     ctx.fillStyle = '#94a3b8';
-    ctx.font = '16px "Inter", sans-serif';
-    ctx.fillText('Level ' + this.level() + ' / ' + this.totalLevels, CANVAS_W / 2, 28);
+    ctx.font = '13px "Inter", sans-serif';
+    ctx.fillText('Level ' + this.level() + ' / ' + this.totalLevels, CANVAS_W / 2, 24);
     ctx.textAlign = 'left';
 
     // Bonus timers
@@ -479,7 +482,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
 
     // Ball with glow
     ctx.shadowColor = '#fbbf24';
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 10;
     ctx.beginPath();
     ctx.arc(this.ball.x, this.ball.y, this.ball.r, 0, Math.PI * 2);
     ctx.fillStyle = '#fbbf24';
@@ -503,45 +506,45 @@ export class GameComponent implements AfterViewInit, OnDestroy {
 
         // Subtle top highlight
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.fillRect(b.x + 2, b.y + 1, b.w - 4, 3);
+        ctx.fillRect(b.x + 2, b.y + 1, b.w - 4, 2);
       }
     });
 
     // Overlays
-    if (this.gameOver()) this.drawOverlay('GAME OVER', `Score: ${this.score()}`, this.isNewHiScore() ? '🎉 NEW HI SCORE!' : 'Tap or press any key to restart');
-    if (this.gameWon()) this.drawOverlay('🎉 YOU WIN!', `Final Score: ${this.score()}`, this.isNewHiScore() ? '🎉 NEW HI SCORE!' : 'Tap or press any key to play again');
+    if (this.gameOver()) this.drawOverlay('GAME OVER', `Score: ${this.score()}`, this.isNewHiScore() ? '🎉 NEW HI SCORE!' : 'Tap to restart');
+    if (this.gameWon()) this.drawOverlay('🎉 YOU WIN!', `Final Score: ${this.score()}`, this.isNewHiScore() ? '🎉 NEW HI SCORE!' : 'Tap to play again');
   }
 
   private drawBonusTimers(): void {
     const ctx = this.ctx;
     const now = Date.now();
-    let y = 18;
-    const x = CANVAS_W - 14;
+    let y = 16;
+    const x = CANVAS_W - 10;
     ctx.textAlign = 'right';
-    ctx.font = '13px "Inter", sans-serif';
+    ctx.font = '11px "Inter", sans-serif';
 
     if (this.speedBonusExpiry > now) {
       const rem = ((this.speedBonusExpiry - now) / 1000).toFixed(1);
       const frac = (this.speedBonusExpiry - now) / BONUS_DURATION_MS;
-      const bW = 80, bH = 5, bX = x - bW, bY = y + 5;
+      const bW = 60, bH = 4, bX = x - bW, bY = y + 4;
       ctx.fillStyle = 'rgba(249,115,22,0.2)';
       ctx.fillRect(bX, bY, bW, bH);
       ctx.fillStyle = '#f97316';
       ctx.fillRect(bX, bY, bW * frac, bH);
       ctx.fillStyle = '#f97316';
-      ctx.fillText('⚡ Speed  ' + rem + 's', x, y);
-      y += 22;
+      ctx.fillText('⚡ ' + rem + 's', x, y);
+      y += 18;
     }
     if (this.paddleBonusExpiry > now) {
       const rem = ((this.paddleBonusExpiry - now) / 1000).toFixed(1);
       const frac = (this.paddleBonusExpiry - now) / BONUS_DURATION_MS;
-      const bW = 80, bH = 5, bX = x - bW, bY = y + 5;
+      const bW = 60, bH = 4, bX = x - bW, bY = y + 4;
       ctx.fillStyle = 'rgba(59,130,246,0.2)';
       ctx.fillRect(bX, bY, bW, bH);
       ctx.fillStyle = '#3b82f6';
       ctx.fillRect(bX, bY, bW * frac, bH);
       ctx.fillStyle = '#3b82f6';
-      ctx.fillText('🏓 Paddle  ' + rem + 's', x, y);
+      ctx.fillText('🏓 ' + rem + 's', x, y);
     }
     ctx.textAlign = 'left';
   }
@@ -552,14 +555,14 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 40px "Inter", sans-serif';
+    ctx.font = 'bold 32px "Inter", sans-serif';
     ctx.fillText(title, CANVAS_W / 2, CANVAS_H / 2 - 40);
-    ctx.font = '22px "Inter", sans-serif';
+    ctx.font = '18px "Inter", sans-serif';
     ctx.fillStyle = '#e2e8f0';
     ctx.fillText(subtitle, CANVAS_W / 2, CANVAS_H / 2 + 5);
-    ctx.font = '15px "Inter", sans-serif';
+    ctx.font = '13px "Inter", sans-serif';
     ctx.fillStyle = hint.includes('HI SCORE') ? '#fbbf24' : '#94a3b8';
-    ctx.fillText(hint, CANVAS_W / 2, CANVAS_H / 2 + 45);
+    ctx.fillText(hint, CANVAS_W / 2, CANVAS_H / 2 + 40);
     ctx.textAlign = 'left';
   }
 
@@ -586,7 +589,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.textAlign = 'center';
     ctx.globalAlpha = this.levelTransitionAlpha;
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 44px "Inter", sans-serif';
+    ctx.font = 'bold 36px "Inter", sans-serif';
     ctx.fillText('Level ' + this.level(), CANVAS_W / 2, CANVAS_H / 2);
     ctx.globalAlpha = 1.0;
     ctx.textAlign = 'left';
