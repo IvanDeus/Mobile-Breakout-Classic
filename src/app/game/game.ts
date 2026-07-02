@@ -22,11 +22,11 @@ interface Ball {
   vx: number; vy: number;
 }
 
-// Canvas sizing constants – fixed 360×600 portrait mobile
+// Canvas sizing constants – fixed  portrait mobile
 const CANVAS_W = 358;
 const CANVAS_H = 640;
 
-// Brick constants – 7 columns fitting 360 px width
+// Brick constants – 7 columns
 const BRICK_COLS = 7;
 const BRICK_W = 40;
 const BRICK_H = 16;
