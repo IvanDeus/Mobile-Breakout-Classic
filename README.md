@@ -1,60 +1,159 @@
 # Mobile-Breakout-Classic
 The classic Breakout-like arcade game built with Angular.
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.0.5.
+<p align="center">
+  <img src="https://img.shields.io/badge/Angular-22-dd0031?logo=angular&logoColor=white" alt="Angular 22" />
+  <img src="https://img.shields.io/badge/TypeScript-6.0-3178c6?logo=typescript&logoColor=white" alt="TypeScript 6" />
+  <img src="https://img.shields.io/badge/Canvas-2D-f7df1e?logo=html5&logoColor=white" alt="HTML5 Canvas" />
+  <img src="https://img.shields.io/badge/License-GPL--3.0-blue" alt="GPL-3.0" />
+  <img src="https://img.shields.io/badge/Mobile-First-22c55e" alt="Mobile First" />
+</p>
 
-## Development server
+A polished, mobile-first **Breakout arcade game** built entirely with **Angular 22** and the **HTML5 Canvas API**. Break bricks, collect power-ups, and chase your hi-score across **10 hand-crafted levels** — all running silky-smooth at 60 fps right in your browser.
 
-To start a local development server, run:
+<p align="center">
+  <em>Touch to control • Collect bonuses • Beat all 10 levels</em>
+</p>
 
-```bash
-ng serve
+---
+
+## ✨ Features
+
+| Feature | Description |
+| --- | --- |
+| 🎮 **10 Unique Levels** | Hand-designed brick layouts — diamonds, chevrons, grids, crosses, and a full-board finale |
+| ⚡ **Power-Up System** | Speed boost, paddle expansion, and score bonuses with visible countdown timers |
+| 🏆 **Persistent Hi-Score** | Local storage saves your best score and last-reached level between sessions |
+| 📱 **Mobile-First Touch** | Smooth lerp-based paddle movement tuned for touch with `passive: false` event handling |
+| 🔊 **Retro Sound FX** | Procedural square-wave audio via the Web Audio API — no asset files needed |
+| 🖥️ **DPR-Aware Canvas** | Crisp rendering on Retina / HiDPI displays with automatic device-pixel-ratio scaling |
+| ⏱️ **Frame-Rate Independent** | Delta-time game loop prevents speed-up/slow-down on irregular frame timing |
+| 🎨 **Sleek Dark UI** | Deep purple gradient aesthetic with glow effects and Inter typography |
+
+---
+
+## 🕹️ Gameplay
+
+```
+┌───────────────────────────────────┐
+│  Score: 120    Level 3 / 10   ⚡3s │
+│                                   │
+│  ██ ██ ██ ██ ██ ██ ██  ← bricks  │
+│     ██ ██ ██ ██ ██                │
+│        ██ ██ ██                   │
+│                                   │
+│            ●  ← ball              │
+│                                   │
+│       ▬▬▬▬▬▬▬  ← paddle          │
+└───────────────────────────────────┘
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+**Controls:**
+- **Mobile** — Touch and drag anywhere on the canvas to move the paddle
+- **Desktop** — Move the mouse over the canvas; click or press any key to start
 
-## Code scaffolding
+**Brick Colors:**
+| Color | Meaning |
+| --- | --- |
+| 🟢 Green | Standard brick (+10 pts) |
+| 🟠 Orange | ⚡ Speed boost (ball speeds up for 5s) |
+| 🔵 Blue | 🏓 Paddle expand (wider paddle for 5s) |
+| 🟣 Purple | 💎 Score bonus (+100 pts instantly) |
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+---
 
-```bash
-ng generate component component-name
+## 🏗️ Architecture
+
+```
+src/
+├── index.html                   # Entry point with mobile-web-app meta tags
+├── main.ts                      # Angular bootstrap
+├── styles.css                   # Global dark-theme styles (Inter font)
+└── app/
+    ├── app.ts                   # Root component
+    ├── app.html
+    ├── app.css
+    ├── app.config.ts            # App configuration
+    ├── game/
+    │   ├── game.ts              # Core game loop, physics, rendering (~670 LOC)
+    │   ├── game.html            # Canvas wrapper template
+    │   └── game.css             # Glassmorphism canvas styling
+    └── services/
+        ├── audio.service.ts     # Web Audio API procedural SFX
+        ├── level.service.ts     # 10 level brick-layout definitions
+        └── storage.service.ts   # localStorage hi-score & level persistence
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+The game runs a single `requestAnimationFrame` loop **outside Angular's zone** (`NgZone.runOutsideAngular`) for zero change-detection overhead during gameplay. UI state uses Angular **signals** for efficient reactivity only when the game state actually changes.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** ≥ 18
+- **npm** ≥ 9
+
+### Install & Run
 
 ```bash
-ng generate --help
+# Clone the repository
+git clone https://github.com/IvanDeus/Mobile-Breakout-Classic.git
+cd Mobile-Breakout-Classic
+
+# Install dependencies
+npm install
+
+# Start development server (port 7001)
+npm start
 ```
 
-## Building
+Then open **http://localhost:7001** in your browser (or scan the network URL on your phone).
 
-To build the project run:
+### Build for Production
 
 ```bash
-ng build
+npm run build
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Optimized output lands in `dist/`.
 
-## Running unit tests
+---
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+## ⚙️ Tech Stack
 
-```bash
-ng test
-```
+| Layer | Technology |
+| --- | --- |
+| Framework | Angular 22 (standalone components, signals) |
+| Language | TypeScript 6.0 |
+| Rendering | HTML5 Canvas 2D |
+| Audio | Web Audio API (procedural synthesis) |
+| Styling | Vanilla CSS with CSS custom properties |
+| Fonts | [Inter](https://fonts.google.com/specimen/Inter) via Google Fonts |
+| Build | Angular CLI / `@angular/build` |
+| Formatter | Prettier |
 
-## Running end-to-end tests
+---
 
-For end-to-end (e2e) testing, run:
+## 🤝 Contributing
 
-```bash
-ng e2e
-```
+1. **Fork** the repository
+2. Create a feature branch — `git checkout -b feat/my-feature`
+3. Commit your changes — `git commit -m "feat: add my feature"`
+4. Push to the branch — `git push origin feat/my-feature`
+5. Open a **Pull Request**
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+---
 
-## Additional Resources
+## 📄 License
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](LICENSE) file for details.
+
+---
+
+<p align="center">
+  Made with 🎮 and Angular
+</p>
+
+2026 [ ivan deus ]
