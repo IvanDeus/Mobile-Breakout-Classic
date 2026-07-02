@@ -23,14 +23,14 @@ interface Ball {
 }
 
 // Canvas sizing constants – fixed  portrait mobile
-const CANVAS_W = 358;
+const CANVAS_W = 348;
 const CANVAS_H = 640;
 
 // Brick constants – 7 columns
 const BRICK_COLS = 7;
 const BRICK_W = 40;
 const BRICK_H = 16;
-const BRICK_PADDING = 5;
+const BRICK_PADDING = 4;
 const BRICK_OFFSET_TOP = 60;
 const BRICK_OFFSET_LEFT = (CANVAS_W - BRICK_COLS * (BRICK_W + BRICK_PADDING) + BRICK_PADDING) / 2;
 
