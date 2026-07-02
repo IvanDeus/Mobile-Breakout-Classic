@@ -1,3 +1,4 @@
+// game.ts
 import {
   Component, ElementRef, ViewChild, AfterViewInit, OnDestroy,
   HostListener, NgZone, ChangeDetectionStrategy, signal, computed
@@ -40,6 +41,11 @@ const MAX_BALL_SPEED = 8;
 const MAX_PADDLE_W = 150;
 const BONUS_DURATION_MS = 5000;
 
+// Smoothing constants
+const PADDLE_LERP = 0.28;        // 0–1: higher = snappier, lower = smoother
+const MAX_PADDLE_PX_PER_FRAME = 18; // hard cap on paddle travel per frame
+const MAX_PADDLE_INFLUENCE = 1.8;   // max velocity the paddle can impart to the ball
+
 @Component({
   selector: 'app-game',
   standalone: true,
@@ -50,7 +56,6 @@ const BONUS_DURATION_MS = 5000;
 export class GameComponent implements AfterViewInit, OnDestroy {
   @ViewChild('gameCanvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
 
-  // Reactive signals for template binding
   readonly score = signal(0);
   readonly level = signal(1);
   readonly hiScore = signal(0);
@@ -66,26 +71,23 @@ export class GameComponent implements AfterViewInit, OnDestroy {
   private ctx!: CanvasRenderingContext2D;
   private animFrameId = 0;
 
-  // Game objects
   private paddle: Paddle = { x: CANVAS_W / 2 - BASE_PADDLE_W / 2, y: 570, w: BASE_PADDLE_W, h: 10, prevX: CANVAS_W / 2 - BASE_PADDLE_W / 2, vx: 0 };
   private ball: Ball = { x: CANVAS_W / 2, y: CANVAS_H / 2, r: 7, vx: BASE_BALL_SPEED, vy: -BASE_BALL_SPEED };
   private bricks: Brick[] = [];
 
-  // Bonus timers
+  // Where the paddle is trying to go (set by input, approached smoothly in update())
+  private paddleTargetX = CANVAS_W / 2 - BASE_PADDLE_W / 2;
+
   private speedBonusTimer: any = null;
   private paddleBonusTimer: any = null;
   private speedBonusExpiry = 0;
   private paddleBonusExpiry = 0;
 
-  // Level transition
   private showingLevelTransition = false;
   private levelTransitionAlpha = 0;
   private levelFadeInterval: any = null;
 
-  // Touch / pointer tracking
   private canvasRect: DOMRect | null = null;
-
-  // DPR for crisp rendering
   private dpr = 1;
 
   constructor(
@@ -114,7 +116,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     clearInterval(this.levelFadeInterval);
   }
 
-  // ── Canvas sizing ──
   private resizeCanvas(): void {
     const canvas = this.canvasRef.nativeElement;
     canvas.width = CANVAS_W * this.dpr;
@@ -130,12 +131,10 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.canvasRect = this.canvasRef.nativeElement.getBoundingClientRect();
   }
 
-  // ── Menu screen ──
   drawMenu(): void {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Background gradient
     const grad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
     grad.addColorStop(0, '#0f0c29');
     grad.addColorStop(0.5, '#302b63');
@@ -143,10 +142,8 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Decorative bricks on menu
     this.drawMenuBricks(ctx);
 
-    // Title
     ctx.textAlign = 'center';
     ctx.shadowColor = '#a78bfa';
     ctx.shadowBlur = 20;
@@ -158,14 +155,12 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.fillStyle = '#a78bfa';
     ctx.fillText('CLASSIC', CANVAS_W / 2, 196);
 
-    // Hi Score & Last Level
     ctx.font = '15px "Inter", sans-serif';
     ctx.fillStyle = '#fbbf24';
     ctx.fillText(`🏆 Hi Score: ${this.hiScore()}`, CANVAS_W / 2, 260);
     ctx.fillStyle = '#94a3b8';
     ctx.fillText(`📊 Last Level: ${this.lastLevel()} / ${this.totalLevels}`, CANVAS_W / 2, 288);
 
-    // Start button
     const bw = 200, bh = 50;
     const bx = CANVAS_W / 2 - bw / 2, by = 330;
     const btnGrad = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
@@ -183,7 +178,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.font = 'bold 20px "Inter", sans-serif';
     ctx.fillText('TAP TO PLAY', CANVAS_W / 2, 362);
 
-    // Controls hint
     ctx.fillStyle = '#64748b';
     ctx.font = '12px "Inter", sans-serif';
     ctx.fillText('Touch to control paddle', CANVAS_W / 2, 420);
@@ -207,7 +201,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.globalAlpha = 1;
   }
 
-  // ── Start game ──
   startGame(): void {
     this.score.set(0);
     this.level.set(1);
@@ -216,6 +209,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.isNewHiScore.set(false);
     this.gameState.set('playing');
     this.paddle = { x: CANVAS_W / 2 - BASE_PADDLE_W / 2, y: 570, w: BASE_PADDLE_W, h: 10, prevX: CANVAS_W / 2 - BASE_PADDLE_W / 2, vx: 0 };
+    this.paddleTargetX = this.paddle.x;
     this.ball = { x: CANVAS_W / 2, y: CANVAS_H / 2, r: 7, vx: BASE_BALL_SPEED, vy: -BASE_BALL_SPEED };
     clearTimeout(this.speedBonusTimer);
     clearTimeout(this.paddleBonusTimer);
@@ -229,7 +223,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  // ── Input handlers ──
   onCanvasClick(): void {
     const state = this.gameState();
     if (state === 'menu' || state === 'gameover' || state === 'won') {
@@ -242,7 +235,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     if (!this.canvasRect) this.canvasRect = this.canvasRef.nativeElement.getBoundingClientRect();
     const scaleX = CANVAS_W / this.canvasRect.width;
     const mx = (event.clientX - this.canvasRect.left) * scaleX;
-    this.paddle.x = Math.max(0, Math.min(CANVAS_W - this.paddle.w, mx - this.paddle.w / 2));
+    this.setPaddleTarget(mx - this.paddle.w / 2);
   }
 
   onTouchStart(event: TouchEvent): void {
@@ -271,7 +264,12 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     if (!this.canvasRect) this.canvasRect = this.canvasRef.nativeElement.getBoundingClientRect();
     const scaleX = CANVAS_W / this.canvasRect.width;
     const mx = (touch.clientX - this.canvasRect.left) * scaleX;
-    this.paddle.x = Math.max(0, Math.min(CANVAS_W - this.paddle.w, mx - this.paddle.w / 2));
+    this.setPaddleTarget(mx - this.paddle.w / 2);
+  }
+
+  /** Clamp and store the desired paddle left-edge position. */
+  private setPaddleTarget(rawX: number): void {
+    this.paddleTargetX = Math.max(0, Math.min(CANVAS_W - this.paddle.w, rawX));
   }
 
   @HostListener('document:keydown')
@@ -282,7 +280,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  // ── Brick creation ──
   private createBricks(): void {
     this.bricks = [];
     const layout = this.levelService.getLevelLayout(this.level());
@@ -305,7 +302,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     return 'score';
   }
 
-  // ── Bonus application ──
   private applyBonus(brick: Brick): void {
     if (!brick.bonus) return;
     if (brick.bonus === 'speed') {
@@ -321,14 +317,21 @@ export class GameComponent implements AfterViewInit, OnDestroy {
         this.speedBonusExpiry = 0;
       }, BONUS_DURATION_MS);
     } else if (brick.bonus === 'paddle') {
+      // Keep the paddle centered on its current position when width changes
+      const oldCenter = this.paddle.x + this.paddle.w / 2;
       this.paddle.w = Math.min(this.paddle.w * 1.5, MAX_PADDLE_W);
-      if (this.paddle.x + this.paddle.w > CANVAS_W) this.paddle.x = CANVAS_W - this.paddle.w;
+      const newLeft = Math.max(0, Math.min(CANVAS_W - this.paddle.w, oldCenter - this.paddle.w / 2));
+      this.paddle.x = newLeft;
+      this.paddleTargetX = newLeft;
       this.audio.playSound(500);
       clearTimeout(this.paddleBonusTimer);
       this.paddleBonusExpiry = Date.now() + BONUS_DURATION_MS;
       this.paddleBonusTimer = setTimeout(() => {
+        const oldC = this.paddle.x + this.paddle.w / 2;
         this.paddle.w = BASE_PADDLE_W;
-        if (this.paddle.x + this.paddle.w > CANVAS_W) this.paddle.x = CANVAS_W - this.paddle.w;
+        const resetLeft = Math.max(0, Math.min(CANVAS_W - this.paddle.w, oldC - this.paddle.w / 2));
+        this.paddle.x = resetLeft;
+        this.paddleTargetX = resetLeft;
         this.paddleBonusExpiry = 0;
       }, BONUS_DURATION_MS);
     } else if (brick.bonus === 'score') {
@@ -337,17 +340,29 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  // ── Update logic ──
   private update(): void {
     if (this.gameOver() || this.gameWon()) return;
 
+    // ── Smooth paddle motion toward target ──
+    const diff = this.paddleTargetX - this.paddle.x;
+    if (Math.abs(diff) > 0.5) {
+      // Lerp + per-frame speed cap: gives easing feel without teleporting
+      const lerpStep = diff * PADDLE_LERP;
+      const capped = Math.sign(lerpStep) * Math.min(Math.abs(lerpStep), MAX_PADDLE_PX_PER_FRAME);
+      this.paddle.x += capped;
+    } else {
+      this.paddle.x = this.paddleTargetX;
+    }
+    // Safety clamp
+    this.paddle.x = Math.max(0, Math.min(CANVAS_W - this.paddle.w, this.paddle.x));
+
+    // Velocity is now derived from the *smoothed* motion, so it stays small
     this.paddle.vx = this.paddle.x - this.paddle.prevX;
     this.paddle.prevX = this.paddle.x;
 
     this.ball.x += this.ball.vx;
     this.ball.y += this.ball.vy;
 
-    // Wall collisions
     if (this.ball.x + this.ball.r > CANVAS_W || this.ball.x - this.ball.r < 0) this.ball.vx *= -1;
     if (this.ball.y - this.ball.r < 0) this.ball.vy *= -1;
 
@@ -361,8 +376,13 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ) {
       this.ball.vy *= -1;
       this.ball.y = this.paddle.y - this.ball.r;
+
       const momentumFactor = 0.25;
-      this.ball.vx += this.paddle.vx * momentumFactor;
+      const rawInfluence = this.paddle.vx * momentumFactor;
+      // Hard cap the paddle's contribution so a fast swipe can't rocket the ball
+      const clampedInfluence = Math.max(-MAX_PADDLE_INFLUENCE, Math.min(MAX_PADDLE_INFLUENCE, rawInfluence));
+      this.ball.vx += clampedInfluence;
+
       const maxVx = MAX_BALL_SPEED * 0.75;
       this.ball.vx = Math.max(-maxVx, Math.min(maxVx, this.ball.vx));
       const minVy = 2.5;
@@ -384,7 +404,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    // Level complete
     if (this.bricks.every(b => b.hit)) {
       this.storage.setLastLevel(this.level());
       this.lastLevel.set(this.level());
@@ -397,7 +416,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    // Ball fell
     if (this.ball.y - this.ball.r > CANVAS_H) {
       this.gameOver.set(true);
       this.gameState.set('gameover');
@@ -425,6 +443,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.paddle.x = CANVAS_W / 2 - BASE_PADDLE_W / 2;
     this.paddle.prevX = this.paddle.x;
     this.paddle.vx = 0;
+    this.paddleTargetX = this.paddle.x;
     this.ball.x = CANVAS_W / 2;
     this.ball.y = CANVAS_H / 2;
     const lvlSpeed = BASE_BALL_SPEED + (this.level() - 1) * 0.3;
@@ -437,12 +456,10 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.lastLevel.set(this.level());
   }
 
-  // ── Drawing ──
   private draw(): void {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Background
     const grad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
     grad.addColorStop(0, '#0f0c29');
     grad.addColorStop(0.5, '#302b63');
@@ -450,28 +467,23 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // HUD - Score
     ctx.textAlign = 'left';
     ctx.fillStyle = '#e2e8f0';
     ctx.font = 'bold 15px "Inter", sans-serif';
     ctx.fillText('Score: ' + this.score(), 10, 24);
 
-    // HUD - Hi Score
     ctx.fillStyle = '#fbbf24';
     ctx.font = '12px "Inter", sans-serif';
     ctx.fillText('🏆 ' + this.displayHiScore(), 10, 42);
 
-    // HUD - Level
     ctx.textAlign = 'center';
     ctx.fillStyle = '#94a3b8';
     ctx.font = '13px "Inter", sans-serif';
     ctx.fillText('Level ' + this.level() + ' / ' + this.totalLevels, CANVAS_W / 2, 24);
     ctx.textAlign = 'left';
 
-    // Bonus timers
     this.drawBonusTimers();
 
-    // Paddle with gradient
     const pg = ctx.createLinearGradient(this.paddle.x, this.paddle.y, this.paddle.x + this.paddle.w, this.paddle.y);
     pg.addColorStop(0, '#7c3aed');
     pg.addColorStop(1, '#a78bfa');
@@ -480,7 +492,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.roundRect(this.paddle.x, this.paddle.y, this.paddle.w, this.paddle.h, 5);
     ctx.fill();
 
-    // Ball with glow
     ctx.shadowColor = '#fbbf24';
     ctx.shadowBlur = 10;
     ctx.beginPath();
@@ -489,7 +500,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // Bricks
     this.bricks.forEach(b => {
       if (!b.hit) {
         let color: string;
@@ -504,13 +514,11 @@ export class GameComponent implements AfterViewInit, OnDestroy {
         ctx.roundRect(b.x, b.y, b.w, b.h, 4);
         ctx.fill();
 
-        // Subtle top highlight
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
         ctx.fillRect(b.x + 2, b.y + 1, b.w - 4, 2);
       }
     });
 
-    // Overlays
     if (this.gameOver()) this.drawOverlay('GAME OVER', `Score: ${this.score()}`, this.isNewHiScore() ? '🎉 NEW HI SCORE!' : 'Tap to restart');
     if (this.gameWon()) this.drawOverlay('🎉 YOU WIN!', `Final Score: ${this.score()}`, this.isNewHiScore() ? '🎉 NEW HI SCORE!' : 'Tap to play again');
   }
@@ -566,7 +574,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.textAlign = 'left';
   }
 
-  // ── Level transition ──
   private showLevelTransition(): void {
     this.showingLevelTransition = true;
     this.levelTransitionAlpha = 1.0;
@@ -595,7 +602,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.textAlign = 'left';
   }
 
-  // ── Game loop ──
   private loop = (): void => {
     this.update();
     this.draw();
@@ -603,8 +609,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     if (!this.gameOver() && !this.gameWon()) {
       this.animFrameId = requestAnimationFrame(this.loop);
     } else {
-      // Final frame is already drawn with overlay
-      this.ngZone.run(() => {}); // trigger CD for template
+      this.ngZone.run(() => {});
     }
   };
 }
