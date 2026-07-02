@@ -379,45 +379,34 @@ export class GameComponent implements AfterViewInit, OnDestroy {
 
     // Paddle collision
     if (
-      this.ball.vy > 0 &&
+      this.ball.vy > 0 && // Only collide if moving downwards
       this.ball.y + this.ball.r > this.paddle.y &&
-      this.ball.y + this.ball.r < this.paddle.y + this.paddle.h + 4 &&
-      this.ball.x > this.paddle.x &&
-      this.ball.x < this.paddle.x + this.paddle.w
+      this.ball.y + this.ball.r < this.paddle.y + this.paddle.h + 8 && // Slightly larger buffer for mobile
+      this.ball.x + this.ball.r > this.paddle.x && // Check ball edges instead of center
+      this.ball.x - this.ball.r < this.paddle.x + this.paddle.w
     ) {
-      this.ball.vy *= -1;
+      // Push ball out of paddle to prevent sticking
       this.ball.y = this.paddle.y - this.ball.r;
 
-      const momentumFactor = 0.25;
-      const rawInfluence = this.paddle.vx * momentumFactor;
-      const clampedInfluence = Math.max(-MAX_PADDLE_INFLUENCE, Math.min(MAX_PADDLE_INFLUENCE, rawInfluence));
-      this.ball.vx += clampedInfluence;
+      // 🟢 Calculate hit position from -1 (left edge) to 1 (right edge)
+      const paddleCenter = this.paddle.x + this.paddle.w / 2;
+      const hitPos = (this.ball.x - paddleCenter) / (this.paddle.w / 2);
+      
+      // Clamp hitPos to prevent extreme horizontal angles
+      const clampedHitPos = Math.max(-0.9, Math.min(0.9, hitPos));
 
-      // 🟢 Normalize the velocity vector to prevent infinite acceleration
+      // Calculate base speed for current level
       const baseSpeed = BASE_BALL_SPEED + (this.level() - 1) * 0.3;
       let targetSpeed = this.speedBonusExpiry > Date.now() ? baseSpeed * 1.5 : baseSpeed;
       targetSpeed = Math.min(targetSpeed, MAX_BALL_SPEED);
 
-      const mag = Math.sqrt(this.ball.vx * this.ball.vx + this.ball.vy * this.ball.vy);
-      if (mag > 0) {
-        this.ball.vx = (this.ball.vx / mag) * targetSpeed;
-        this.ball.vy = (this.ball.vy / mag) * targetSpeed;
-      }
+      // Max bounce angle (75 degrees in radians)
+      const maxBounceAngle = 75 * (Math.PI / 180); 
+      const bounceAngle = clampedHitPos * maxBounceAngle;
 
-      // Prevent the ball from getting stuck in a purely horizontal loop
-      const minVy = 2.5;
-      if (Math.abs(this.ball.vy) < minVy) {
-        this.ball.vy = (this.ball.vy >= 0 ? 1 : -1) * minVy;
-        // Re-normalize after forcing minVy
-        const newMag = Math.sqrt(this.ball.vx * this.ball.vx + this.ball.vy * this.ball.vy);
-        if (newMag > 0) {
-          this.ball.vx = (this.ball.vx / newMag) * targetSpeed;
-          this.ball.vy = (this.ball.vy / newMag) * targetSpeed;
-        }
-      }
-
-      // Absolute safety net to ensure ball always moves away from paddle
-      if (this.ball.vy > 0) this.ball.vy *= -1;
+      // 🟢 Set new velocity based on angle and target speed
+      this.ball.vx = targetSpeed * Math.sin(bounceAngle);
+      this.ball.vy = -targetSpeed * Math.cos(bounceAngle); // Negative because it moves UP
 
       this.audio.playSound(300);
     }
