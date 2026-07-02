@@ -36,15 +36,15 @@ A polished, mobile-first **Breakout arcade game** built entirely with **Angular 
 
 ```
 ┌───────────────────────────────────┐
-│  Score: 120    Level 3 / 10   ⚡3s │
-│                                   │
-│  ██ ██ ██ ██ ██ ██ ██  ← bricks  │
-│     ██ ██ ██ ██ ██                │
-│        ██ ██ ██                   │
-│                                   │
-│            ●  ← ball              │
-│                                   │
-│       ▬▬▬▬▬▬▬  ← paddle          │
+│  Score: 120    Level 3 / 10   ⚡3s
+│                                   
+│  ██ ██ ██ ██ ██ ██ ██  ← bricks   
+│     ██ ██ ██ ██ ██                
+│        ██ ██ ██                   
+│                                   
+│            ●  ← ball              
+│                                   
+│       ▬▬▬▬▬▬▬  ← paddle           
 └───────────────────────────────────┘
 ```
 
