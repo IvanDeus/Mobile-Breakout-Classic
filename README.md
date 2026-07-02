@@ -170,8 +170,4 @@ This project is licensed under the **GNU General Public License v3.0** — see t
 
 ---
 
-<p align="center">
-  Made with 🎮 and Angular
-</p>
-
 2026 [ ivan deus ]
