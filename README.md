@@ -130,19 +130,7 @@ Optimized output lands in `dist/`.
 | Rendering | HTML5 Canvas 2D |
 | Audio | Web Audio API (procedural synthesis) |
 | Styling | Vanilla CSS with CSS custom properties |
-| Fonts | [Inter](https://fonts.google.com/specimen/Inter) via Google Fonts |
-| Build | Angular CLI / `@angular/build` |
 | Formatter | Prettier |
-
----
-
-## 🤝 Contributing
-
-1. **Fork** the repository
-2. Create a feature branch — `git checkout -b feat/my-feature`
-3. Commit your changes — `git commit -m "feat: add my feature"`
-4. Push to the branch — `git push origin feat/my-feature`
-5. Open a **Pull Request**
 
 ---
 
