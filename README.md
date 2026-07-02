@@ -121,6 +121,36 @@ Optimized output lands in `dist/`.
 
 ---
 
+### Run Nginx (Recommended for Production)
+
+1. **Install Nginx:**
+   ```bash
+   sudo apt update
+   sudo apt install nginx
+   ```
+
+2. **Copy build files:**
+   ```bash
+   sudo cp -r dist/Mobile-Breakout-Classic/browser/* /var/www/html/
+   ```
+
+3. **Configure Nginx** (`/etc/nginx/sites-available/default`):
+   ```nginx
+   server {
+       listen 7001 default_server;
+       root /var/www/html;
+       index index.html;
+       location / {
+           try_files $uri $uri/ /index.html;
+       }
+   }
+   ```
+
+4. **Restart Nginx:**
+   ```bash
+   sudo systemctl restart nginx
+   ```
+   
 ## ⚙️ Tech Stack
 
 | Layer | Technology |
