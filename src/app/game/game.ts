@@ -89,6 +89,12 @@ export class GameComponent implements AfterViewInit, OnDestroy {
 
   private canvasRect: DOMRect | null = null;
   private dpr = 1;
+  private lastFrameTime = 0;
+
+  // Bound references so we can add/remove with { passive: false }
+  private boundTouchStart = (e: TouchEvent) => this.onTouchStart(e);
+  private boundTouchMove  = (e: TouchEvent) => this.onTouchMove(e);
+  private boundTouchEnd   = (e: TouchEvent) => this.onTouchEnd(e);
 
   constructor(
     private audio: AudioService,
@@ -106,6 +112,14 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.ctx = canvas.getContext('2d')!;
     this.dpr = window.devicePixelRatio || 1;
     this.resizeCanvas();
+
+    // Register touch listeners with { passive: false } so preventDefault()
+    // actually works on Android Chrome (Angular template bindings are passive
+    // by default, which silently ignores preventDefault and lets the page scroll).
+    canvas.addEventListener('touchstart', this.boundTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', this.boundTouchMove, { passive: false });
+    canvas.addEventListener('touchend', this.boundTouchEnd, { passive: false });
+
     this.drawMenu();
   }
 
@@ -114,6 +128,13 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     clearTimeout(this.speedBonusTimer);
     clearTimeout(this.paddleBonusTimer);
     clearInterval(this.levelFadeInterval);
+
+    const canvas = this.canvasRef?.nativeElement;
+    if (canvas) {
+      canvas.removeEventListener('touchstart', this.boundTouchStart);
+      canvas.removeEventListener('touchmove', this.boundTouchMove);
+      canvas.removeEventListener('touchend', this.boundTouchEnd);
+    }
   }
 
   private resizeCanvas(): void {
@@ -228,6 +249,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.paddleBonusExpiry = 0;
     this.createBricks();
     this.showLevelTransition();
+    this.lastFrameTime = 0;
 
     this.ngZone.runOutsideAngular(() => {
       this.loop();
@@ -351,15 +373,18 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private update(): void {
+  private update(dt: number): void {
     if (this.gameOver() || this.gameWon()) return;
 
-    // ── Smooth paddle motion toward target ──
+    // ── Smooth paddle motion toward target (dt-adjusted) ──
     const diff = this.paddleTargetX - this.paddle.x;
     if (Math.abs(diff) > 0.5) {
       // Lerp + per-frame speed cap: gives easing feel without teleporting
-      const lerpStep = diff * PADDLE_LERP;
-      const capped = Math.sign(lerpStep) * Math.min(Math.abs(lerpStep), MAX_PADDLE_PX_PER_FRAME);
+      // Use exponential lerp so smoothing is frame-rate independent
+      const lerpFactor = 1 - Math.pow(1 - PADDLE_LERP, dt);
+      const lerpStep = diff * lerpFactor;
+      const maxMove = MAX_PADDLE_PX_PER_FRAME * dt;
+      const capped = Math.sign(lerpStep) * Math.min(Math.abs(lerpStep), maxMove);
       this.paddle.x += capped;
     } else {
       this.paddle.x = this.paddleTargetX;
@@ -371,8 +396,8 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.paddle.vx = this.paddle.x - this.paddle.prevX;
     this.paddle.prevX = this.paddle.x;
 
-    this.ball.x += this.ball.vx;
-    this.ball.y += this.ball.vy;
+    this.ball.x += this.ball.vx * dt;
+    this.ball.y += this.ball.vy * dt;
 
     if (this.ball.x + this.ball.r > CANVAS_W || this.ball.x - this.ball.r < 0) this.ball.vx *= -1;
     if (this.ball.y - this.ball.r < 0) this.ball.vy *= -1;
@@ -621,8 +646,17 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     ctx.textAlign = 'left';
   }
 
-  private loop = (): void => {
-    this.update();
+  private loop = (timestamp?: number): void => {
+    // Calculate delta-time factor (1.0 = one ideal frame at 60 fps ≈ 16.667 ms).
+    // This makes ball & paddle movement frame-rate independent, preventing
+    // speed-up when Android Chrome delivers irregular frame timing during touch.
+    const now = timestamp ?? performance.now();
+    const rawDt = this.lastFrameTime ? (now - this.lastFrameTime) / 16.667 : 1;
+    this.lastFrameTime = now;
+    // Clamp to avoid huge jumps after tab-switch or lag spike
+    const dt = Math.min(rawDt, 3);
+
+    this.update(dt);
     this.draw();
     this.drawLevelTransition();
     if (!this.gameOver() && !this.gameWon()) {
