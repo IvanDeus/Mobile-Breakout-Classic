@@ -202,8 +202,19 @@ export class GameComponent implements AfterViewInit, OnDestroy {
   }
 
   startGame(): void {
+    // 🟢 Load the last saved level from local storage (defaults to 1 if none)
+    const savedLevel = this.storage.getLastLevel();
+    let startLevel = savedLevel > 0 ? savedLevel : 1;
+
+    // 🟢 If the player just beat the game, start a fresh run from level 1
+    if (this.gameState() === 'won' || startLevel > this.totalLevels) {
+      startLevel = 1;
+      this.storage.setLastLevel(1);
+      this.lastLevel.set(1);
+    }
+
     this.score.set(0);
-    this.level.set(1);
+    this.level.set(startLevel); // 🟢 Use startLevel instead of hardcoded 1
     this.gameOver.set(false);
     this.gameWon.set(false);
     this.isNewHiScore.set(false);
