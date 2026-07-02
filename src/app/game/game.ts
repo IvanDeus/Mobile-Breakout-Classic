@@ -214,7 +214,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     }
 
     this.score.set(0);
-    this.level.set(startLevel); // 🟢 Use startLevel instead of hardcoded 1
+    this.level.set(startLevel); 
     this.gameOver.set(false);
     this.gameWon.set(false);
     this.isNewHiScore.set(false);
@@ -390,16 +390,35 @@ export class GameComponent implements AfterViewInit, OnDestroy {
 
       const momentumFactor = 0.25;
       const rawInfluence = this.paddle.vx * momentumFactor;
-      // Hard cap the paddle's contribution so a fast swipe can't rocket the ball
       const clampedInfluence = Math.max(-MAX_PADDLE_INFLUENCE, Math.min(MAX_PADDLE_INFLUENCE, rawInfluence));
       this.ball.vx += clampedInfluence;
 
-      const maxVx = MAX_BALL_SPEED * 0.75;
-      this.ball.vx = Math.max(-maxVx, Math.min(maxVx, this.ball.vx));
+      // 🟢 Normalize the velocity vector to prevent infinite acceleration
+      const baseSpeed = BASE_BALL_SPEED + (this.level() - 1) * 0.3;
+      let targetSpeed = this.speedBonusExpiry > Date.now() ? baseSpeed * 1.5 : baseSpeed;
+      targetSpeed = Math.min(targetSpeed, MAX_BALL_SPEED);
+
+      const mag = Math.sqrt(this.ball.vx * this.ball.vx + this.ball.vy * this.ball.vy);
+      if (mag > 0) {
+        this.ball.vx = (this.ball.vx / mag) * targetSpeed;
+        this.ball.vy = (this.ball.vy / mag) * targetSpeed;
+      }
+
+      // Prevent the ball from getting stuck in a purely horizontal loop
       const minVy = 2.5;
       if (Math.abs(this.ball.vy) < minVy) {
-        this.ball.vy = (Math.sign(this.ball.vy) || -1) * minVy;
+        this.ball.vy = (this.ball.vy >= 0 ? 1 : -1) * minVy;
+        // Re-normalize after forcing minVy
+        const newMag = Math.sqrt(this.ball.vx * this.ball.vx + this.ball.vy * this.ball.vy);
+        if (newMag > 0) {
+          this.ball.vx = (this.ball.vx / newMag) * targetSpeed;
+          this.ball.vy = (this.ball.vy / newMag) * targetSpeed;
+        }
       }
+
+      // Absolute safety net to ensure ball always moves away from paddle
+      if (this.ball.vy > 0) this.ball.vy *= -1;
+
       this.audio.playSound(300);
     }
 
