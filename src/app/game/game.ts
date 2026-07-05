@@ -373,14 +373,13 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+
   private update(dt: number): void {
     if (this.gameOver() || this.gameWon()) return;
 
     // ── Smooth paddle motion toward target (dt-adjusted) ──
     const diff = this.paddleTargetX - this.paddle.x;
     if (Math.abs(diff) > 0.5) {
-      // Lerp + per-frame speed cap: gives easing feel without teleporting
-      // Use exponential lerp so smoothing is frame-rate independent
       const lerpFactor = 1 - Math.pow(1 - PADDLE_LERP, dt);
       const lerpStep = diff * lerpFactor;
       const maxMove = MAX_PADDLE_PX_PER_FRAME * dt;
@@ -389,62 +388,91 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     } else {
       this.paddle.x = this.paddleTargetX;
     }
-    // Safety clamp
     this.paddle.x = Math.max(0, Math.min(CANVAS_W - this.paddle.w, this.paddle.x));
 
-    // Velocity is now derived from the *smoothed* motion, so it stays small
     this.paddle.vx = this.paddle.x - this.paddle.prevX;
     this.paddle.prevX = this.paddle.x;
 
     this.ball.x += this.ball.vx * dt;
     this.ball.y += this.ball.vy * dt;
 
-    if (this.ball.x + this.ball.r > CANVAS_W || this.ball.x - this.ball.r < 0) this.ball.vx *= -1;
-    if (this.ball.y - this.ball.r < 0) this.ball.vy *= -1;
+    // Wall collisions with positional correction
+    if (this.ball.x - this.ball.r < 0) {
+      this.ball.x = this.ball.r;           // Push out of left wall
+      this.ball.vx = Math.abs(this.ball.vx); // Ensure moving right
+    } else if (this.ball.x + this.ball.r > CANVAS_W) {
+      this.ball.x = CANVAS_W - this.ball.r; // Push out of right wall
+      this.ball.vx = -Math.abs(this.ball.vx); // Ensure moving left
+    }
 
-    // Paddle collision
+    if (this.ball.y - this.ball.r < 0) {
+      this.ball.y = this.ball.r;            // Push out of ceiling
+      this.ball.vy = Math.abs(this.ball.vy); // Ensure moving down
+    }
+
+    // Paddle collision (unchanged – already has positional correction)
     if (
-      this.ball.vy > 0 && // Only collide if moving downwards
+      this.ball.vy > 0 &&
       this.ball.y + this.ball.r > this.paddle.y &&
-      this.ball.y + this.ball.r < this.paddle.y + this.paddle.h + 8 && // Slightly larger buffer for mobile
-      this.ball.x + this.ball.r > this.paddle.x && // Check ball edges instead of center
+      this.ball.y + this.ball.r < this.paddle.y + this.paddle.h + 8 &&
+      this.ball.x + this.ball.r > this.paddle.x &&
       this.ball.x - this.ball.r < this.paddle.x + this.paddle.w
     ) {
-      // Push ball out of paddle to prevent sticking
       this.ball.y = this.paddle.y - this.ball.r;
 
-      // 🟢 Calculate hit position from -1 (left edge) to 1 (right edge)
       const paddleCenter = this.paddle.x + this.paddle.w / 2;
       const hitPos = (this.ball.x - paddleCenter) / (this.paddle.w / 2);
-      
-      // Clamp hitPos to prevent extreme horizontal angles
       const clampedHitPos = Math.max(-0.9, Math.min(0.9, hitPos));
 
-      // Calculate base speed for current level
       const baseSpeed = BASE_BALL_SPEED + (this.level() - 1) * 0.3;
       let targetSpeed = this.speedBonusExpiry > Date.now() ? baseSpeed * 1.5 : baseSpeed;
       targetSpeed = Math.min(targetSpeed, MAX_BALL_SPEED);
 
-      // Max bounce angle (75 degrees in radians)
-      const maxBounceAngle = 75 * (Math.PI / 180); 
+      const maxBounceAngle = 75 * (Math.PI / 180);
       const bounceAngle = clampedHitPos * maxBounceAngle;
 
-      // 🟢 Set new velocity based on angle and target speed
       this.ball.vx = targetSpeed * Math.sin(bounceAngle);
-      this.ball.vy = -targetSpeed * Math.cos(bounceAngle); // Negative because it moves UP
+      this.ball.vy = -targetSpeed * Math.cos(bounceAngle);
 
       this.audio.playSound(300);
     }
 
-    // Brick collision
+    // Proper circle-vs-AABB brick collision with positional correction
     for (let i = 0; i < this.bricks.length; i++) {
       const b = this.bricks[i];
-      if (!b.hit && this.ball.x > b.x && this.ball.x < b.x + b.w && this.ball.y - this.ball.r < b.y + b.h && this.ball.y + this.ball.r > b.y) {
-        b.hit = true; this.ball.vy *= -1;
+      if (b.hit) continue;
+
+      // Find closest point on brick AABB to ball center
+      const closestX = Math.max(b.x, Math.min(this.ball.x, b.x + b.w));
+      const closestY = Math.max(b.y, Math.min(this.ball.y, b.y + b.h));
+
+      const dx = this.ball.x - closestX;
+      const dy = this.ball.y - closestY;
+      const distSq = dx * dx + dy * dy;
+
+      if (distSq < this.ball.r * this.ball.r) {
+        b.hit = true;
         this.score.update(s => s + 10);
         this.audio.playSound(200);
         this.applyBonus(b);
-        break;
+
+        // Determine which face was hit based on penetration direction
+        // Use absolute overlap to decide horizontal vs vertical reflection
+        const overlapX = this.ball.r - Math.abs(dx);
+        const overlapY = this.ball.r - Math.abs(dy);
+
+        // Positional correction + velocity reflection
+        if (overlapX < overlapY) {
+          // Horizontal face hit
+          this.ball.vx *= -1;
+          this.ball.x += (dx > 0 ? overlapX : -overlapX);
+        } else {
+          // Vertical face hit
+          this.ball.vy *= -1;
+          this.ball.y += (dy > 0 ? overlapY : -overlapY);
+        }
+
+        break; // Only collide with one brick per frame
       }
     }
 
@@ -466,6 +494,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
       this.saveScore();
     }
   }
+
 
   private saveScore(): void {
     const isNew = this.storage.updateHiScore(this.score());
