@@ -22,7 +22,7 @@ A polished, mobile-first **Breakout arcade game** built entirely with **Angular 
 | Feature | Description |
 | --- | --- |
 | 🎮 **10 Unique Levels** | Hand-designed brick layouts — diamonds, chevrons, grids, crosses, and a full-board finale |
-| ⚡ **Power-Up System** | Speed boost, paddle expansion, and score bonuses with visible countdown timers |
+| ⚡ **Power-Up System** | Speed boost, paddle expansion, magnet and score bonuses with visible countdown timers |
 | 🏆 **Persistent Hi-Score** | Local storage saves your best score and last-reached level between sessions |
 | 📱 **Mobile-First Touch** | Smooth lerp-based paddle movement tuned for touch with `passive: false` event handling |
 | 🔊 **Retro Sound FX** | Procedural square-wave audio via the Web Audio API — no asset files needed |

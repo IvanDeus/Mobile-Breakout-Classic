@@ -9,7 +9,7 @@ import { LevelService } from '../services/level.service';
 
 interface Brick {
   x: number; y: number; w: number; h: number;
-  hit: boolean; bonus: 'speed' | 'paddle' | 'score' | null;
+  hit: boolean; bonus: 'speed' | 'paddle' | 'score' | 'rule' | null; // 🟢 Added 'rule'
 }
 
 interface Paddle {
@@ -80,8 +80,10 @@ export class GameComponent implements AfterViewInit, OnDestroy {
 
   private speedBonusTimer: any = null;
   private paddleBonusTimer: any = null;
+  private ruleBonusTimer: any = null;      // 🟢 NEW
   private speedBonusExpiry = 0;
   private paddleBonusExpiry = 0;
+  private ruleBonusExpiry = 0;             // 🟢 NEW
 
   private showingLevelTransition = false;
   private levelTransitionAlpha = 0;
@@ -113,9 +115,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.dpr = window.devicePixelRatio || 1;
     this.resizeCanvas();
 
-    // Register touch listeners with { passive: false } so preventDefault()
-    // actually works on Android Chrome (Angular template bindings are passive
-    // by default, which silently ignores preventDefault and lets the page scroll).
     canvas.addEventListener('touchstart', this.boundTouchStart, { passive: false });
     canvas.addEventListener('touchmove', this.boundTouchMove, { passive: false });
     canvas.addEventListener('touchend', this.boundTouchEnd, { passive: false });
@@ -127,6 +126,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     cancelAnimationFrame(this.animFrameId);
     clearTimeout(this.speedBonusTimer);
     clearTimeout(this.paddleBonusTimer);
+    clearTimeout(this.ruleBonusTimer);      // 🟢 NEW
     clearInterval(this.levelFadeInterval);
 
     const canvas = this.canvasRef?.nativeElement;
@@ -223,11 +223,9 @@ export class GameComponent implements AfterViewInit, OnDestroy {
   }
 
   startGame(): void {
-    // 🟢 Load the last saved level from local storage (defaults to 1 if none)
     const savedLevel = this.storage.getLastLevel();
     let startLevel = savedLevel > 0 ? savedLevel : 1;
 
-    // 🟢 If the player just beat the game, start a fresh run from level 1
     if (this.gameState() === 'won' || startLevel > this.totalLevels) {
       startLevel = 1;
       this.storage.setLastLevel(1);
@@ -243,10 +241,14 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.paddle = { x: CANVAS_W / 2 - BASE_PADDLE_W / 2, y: 570, w: BASE_PADDLE_W, h: 10, prevX: CANVAS_W / 2 - BASE_PADDLE_W / 2, vx: 0 };
     this.paddleTargetX = this.paddle.x;
     this.ball = { x: CANVAS_W / 2, y: CANVAS_H / 2, r: 7, vx: BASE_BALL_SPEED, vy: -BASE_BALL_SPEED };
+    
     clearTimeout(this.speedBonusTimer);
     clearTimeout(this.paddleBonusTimer);
+    clearTimeout(this.ruleBonusTimer);      // 🟢 NEW
     this.speedBonusExpiry = 0;
     this.paddleBonusExpiry = 0;
+    this.ruleBonusExpiry = 0;             // 🟢 NEW
+    
     this.createBricks();
     this.showLevelTransition();
     this.lastFrameTime = 0;
@@ -300,7 +302,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.setPaddleTarget(mx - this.paddle.w / 2);
   }
 
-  /** Clamp and store the desired paddle left-edge position. */
   private setPaddleTarget(rawX: number): void {
     this.paddleTargetX = Math.max(0, Math.min(CANVAS_W - this.paddle.w, rawX));
   }
@@ -328,11 +329,12 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private randomBonus(): 'speed' | 'paddle' | 'score' {
+  private randomBonus(): 'speed' | 'paddle' | 'score' | 'rule' { // 🟢 Updated return type
     const r = Math.random();
-    if (r < 0.33) return 'speed';
-    if (r < 0.66) return 'paddle';
-    return 'score';
+    if (r < 0.25) return 'speed';
+    if (r < 0.50) return 'paddle';
+    if (r < 0.75) return 'score';
+    return 'rule'; // 🟢 NEW
   }
 
   private applyBonus(brick: Brick): void {
@@ -350,7 +352,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
         this.speedBonusExpiry = 0;
       }, BONUS_DURATION_MS);
     } else if (brick.bonus === 'paddle') {
-      // Keep the paddle centered on its current position when width changes
       const oldCenter = this.paddle.x + this.paddle.w / 2;
       this.paddle.w = Math.min(this.paddle.w * 1.5, MAX_PADDLE_W);
       const newLeft = Math.max(0, Math.min(CANVAS_W - this.paddle.w, oldCenter - this.paddle.w / 2));
@@ -370,6 +371,13 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     } else if (brick.bonus === 'score') {
       this.score.update(s => s + 100);
       this.audio.playSound(600);
+    } else if (brick.bonus === 'rule') { // 🟢 NEW
+      this.audio.playSound(800);
+      clearTimeout(this.ruleBonusTimer);
+      this.ruleBonusExpiry = Date.now() + BONUS_DURATION_MS;
+      this.ruleBonusTimer = setTimeout(() => {
+        this.ruleBonusExpiry = 0;
+      }, BONUS_DURATION_MS);
     }
   }
 
@@ -393,6 +401,13 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.paddle.vx = this.paddle.x - this.paddle.prevX;
     this.paddle.prevX = this.paddle.x;
 
+    // 🟢 NEW: RULE THE BALL LOGIC
+    // If active, add the paddle's horizontal movement directly to the ball's X coordinate.
+    // This allows the player to "steer" the ball left/right while it is in flight.
+    if (this.ruleBonusExpiry > Date.now()) {
+      this.ball.x += this.paddle.vx;
+    }
+
     this.ball.x += this.ball.vx * dt;
     this.ball.y += this.ball.vy * dt;
 
@@ -410,7 +425,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
       this.ball.vy = Math.abs(this.ball.vy); // Ensure moving down
     }
 
-    // Paddle collision (unchanged – already has positional correction)
+    // Paddle collision
     if (
       this.ball.vy > 0 &&
       this.ball.y + this.ball.r > this.paddle.y &&
@@ -442,7 +457,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
       const b = this.bricks[i];
       if (b.hit) continue;
 
-      // Find closest point on brick AABB to ball center
       const closestX = Math.max(b.x, Math.min(this.ball.x, b.x + b.w));
       const closestY = Math.max(b.y, Math.min(this.ball.y, b.y + b.h));
 
@@ -456,23 +470,18 @@ export class GameComponent implements AfterViewInit, OnDestroy {
         this.audio.playSound(200);
         this.applyBonus(b);
 
-        // Determine which face was hit based on penetration direction
-        // Use absolute overlap to decide horizontal vs vertical reflection
         const overlapX = this.ball.r - Math.abs(dx);
         const overlapY = this.ball.r - Math.abs(dy);
 
-        // Positional correction + velocity reflection
         if (overlapX < overlapY) {
-          // Horizontal face hit
           this.ball.vx *= -1;
           this.ball.x += (dx > 0 ? overlapX : -overlapX);
         } else {
-          // Vertical face hit
           this.ball.vy *= -1;
           this.ball.y += (dy > 0 ? overlapY : -overlapY);
         }
 
-        break; // Only collide with one brick per frame
+        break; 
       }
     }
 
@@ -510,8 +519,10 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.level.update(l => l + 1);
     clearTimeout(this.speedBonusTimer);
     clearTimeout(this.paddleBonusTimer);
+    clearTimeout(this.ruleBonusTimer);      // 🟢 NEW
     this.speedBonusExpiry = 0;
     this.paddleBonusExpiry = 0;
+    this.ruleBonusExpiry = 0;             // 🟢 NEW
     this.paddle.w = BASE_PADDLE_W;
     this.paddle.x = CANVAS_W / 2 - BASE_PADDLE_W / 2;
     this.paddle.prevX = this.paddle.x;
@@ -580,6 +591,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
           case 'speed': color = '#f97316'; break;
           case 'paddle': color = '#3b82f6'; break;
           case 'score': color = '#d946ef'; break;
+          case 'rule': color = '#ec4899'; break; // 🟢 NEW: Pink/Magenta for Rule
           default: color = '#22c55e';
         }
         ctx.fillStyle = color;
@@ -626,6 +638,20 @@ export class GameComponent implements AfterViewInit, OnDestroy {
       ctx.fillRect(bX, bY, bW * frac, bH);
       ctx.fillStyle = '#3b82f6';
       ctx.fillText('🏓 ' + rem + 's', x, y);
+      y += 18; // Fixed missing increment from original code
+    }
+    // 🟢 NEW: Rule the Ball Timer
+    if (this.ruleBonusExpiry > now) {
+      const rem = ((this.ruleBonusExpiry - now) / 1000).toFixed(1);
+      const frac = (this.ruleBonusExpiry - now) / BONUS_DURATION_MS;
+      const bW = 60, bH = 4, bX = x - bW, bY = y + 4;
+      ctx.fillStyle = 'rgba(236,72,153,0.2)';
+      ctx.fillRect(bX, bY, bW, bH);
+      ctx.fillStyle = '#ec4899';
+      ctx.fillRect(bX, bY, bW * frac, bH);
+      ctx.fillStyle = '#ec4899';
+      ctx.fillText('🧲 ' + rem + 's', x, y);
+      y += 18;
     }
     ctx.textAlign = 'left';
   }
@@ -676,13 +702,9 @@ export class GameComponent implements AfterViewInit, OnDestroy {
   }
 
   private loop = (timestamp?: number): void => {
-    // Calculate delta-time factor (1.0 = one ideal frame at 60 fps ≈ 16.667 ms).
-    // This makes ball & paddle movement frame-rate independent, preventing
-    // speed-up when Android Chrome delivers irregular frame timing during touch.
     const now = timestamp ?? performance.now();
     const rawDt = this.lastFrameTime ? (now - this.lastFrameTime) / 16.667 : 1;
     this.lastFrameTime = now;
-    // Clamp to avoid huge jumps after tab-switch or lag spike
     const dt = Math.min(rawDt, 3);
 
     this.update(dt);
