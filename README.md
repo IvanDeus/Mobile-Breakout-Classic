@@ -58,6 +58,7 @@ A polished, mobile-first **Breakout arcade game** built entirely with **Angular 
 | 🟢 Green | Standard brick (+10 pts) |
 | 🟠 Orange | ⚡ Speed boost (ball speeds up for 5s) |
 | 🔵 Blue | 🏓 Paddle expand (wider paddle for 5s) |
+| 🟠 Pink | 🧲 Paddle magnet (ball steers for 5s) |
 | 🟣 Purple | 💎 Score bonus (+100 pts instantly) |
 
 ---
