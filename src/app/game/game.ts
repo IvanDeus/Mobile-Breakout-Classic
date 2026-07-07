@@ -9,7 +9,7 @@ import { LevelService } from '../services/level.service';
 
 interface Brick {
   x: number; y: number; w: number; h: number;
-  hit: boolean; bonus: 'speed' | 'paddle' | 'score' | 'rule' | null; // 🟢 Added 'rule'
+  hit: boolean; bonus: 'speed' | 'paddle' | 'score' | 'rule' | null; 
 }
 
 interface Paddle {
@@ -22,11 +22,11 @@ interface Ball {
   vx: number; vy: number;
 }
 
-// Canvas sizing constants – fixed  portrait mobile
+// portrait mobile
 const CANVAS_W = 344;
 const CANVAS_H = 610;
 
-// Brick constants – 7 columns
+// Brick constants
 const BRICK_COLS = 7;
 const BRICK_W = 40;
 const BRICK_H = 16;
@@ -80,10 +80,10 @@ export class GameComponent implements AfterViewInit, OnDestroy {
 
   private speedBonusTimer: any = null;
   private paddleBonusTimer: any = null;
-  private ruleBonusTimer: any = null;      // 🟢 NEW
+  private ruleBonusTimer: any = null; 
   private speedBonusExpiry = 0;
   private paddleBonusExpiry = 0;
-  private ruleBonusExpiry = 0;             // 🟢 NEW
+  private ruleBonusExpiry = 0;   
 
   private showingLevelTransition = false;
   private levelTransitionAlpha = 0;
@@ -93,7 +93,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
   private dpr = 1;
   private lastFrameTime = 0;
 
-  // Bound references so we can add/remove with { passive: false }
+  // Bound references 
   private boundTouchStart = (e: TouchEvent) => this.onTouchStart(e);
   private boundTouchMove  = (e: TouchEvent) => this.onTouchMove(e);
   private boundTouchEnd   = (e: TouchEvent) => this.onTouchEnd(e);
@@ -126,7 +126,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     cancelAnimationFrame(this.animFrameId);
     clearTimeout(this.speedBonusTimer);
     clearTimeout(this.paddleBonusTimer);
-    clearTimeout(this.ruleBonusTimer);      // 🟢 NEW
+    clearTimeout(this.ruleBonusTimer);  
     clearInterval(this.levelFadeInterval);
 
     const canvas = this.canvasRef?.nativeElement;
@@ -244,10 +244,10 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     
     clearTimeout(this.speedBonusTimer);
     clearTimeout(this.paddleBonusTimer);
-    clearTimeout(this.ruleBonusTimer);      // 🟢 NEW
+    clearTimeout(this.ruleBonusTimer);  
     this.speedBonusExpiry = 0;
     this.paddleBonusExpiry = 0;
-    this.ruleBonusExpiry = 0;             // 🟢 NEW
+    this.ruleBonusExpiry = 0;   
     
     this.createBricks();
     this.showLevelTransition();
@@ -329,12 +329,12 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private randomBonus(): 'speed' | 'paddle' | 'score' | 'rule' { // 🟢 Updated return type
+  private randomBonus(): 'speed' | 'paddle' | 'score' | 'rule' {
     const r = Math.random();
     if (r < 0.25) return 'speed';
     if (r < 0.50) return 'paddle';
     if (r < 0.75) return 'score';
-    return 'rule'; // 🟢 NEW
+    return 'rule'; 
   }
 
   private applyBonus(brick: Brick): void {
@@ -371,7 +371,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     } else if (brick.bonus === 'score') {
       this.score.update(s => s + 100);
       this.audio.playSound(600);
-    } else if (brick.bonus === 'rule') { // 🟢 NEW
+    } else if (brick.bonus === 'rule') { 
       this.audio.playSound(800);
       clearTimeout(this.ruleBonusTimer);
       this.ruleBonusExpiry = Date.now() + BONUS_DURATION_MS;
@@ -400,8 +400,6 @@ export class GameComponent implements AfterViewInit, OnDestroy {
 
     this.paddle.vx = this.paddle.x - this.paddle.prevX;
     this.paddle.prevX = this.paddle.x;
-
-    // 🟢 NEW: RULE THE BALL LOGIC
     // If active, add the paddle's horizontal movement directly to the ball's X coordinate.
     // This allows the player to "steer" the ball left/right while it is in flight.
     if (this.ruleBonusExpiry > Date.now()) {
@@ -452,7 +450,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
       this.audio.playSound(300);
     }
 
-    // Proper circle-vs-AABB brick collision with positional correction
+    // Circle-vs-AABB brick collision with positional correction
     for (let i = 0; i < this.bricks.length; i++) {
       const b = this.bricks[i];
       if (b.hit) continue;
@@ -519,10 +517,10 @@ export class GameComponent implements AfterViewInit, OnDestroy {
     this.level.update(l => l + 1);
     clearTimeout(this.speedBonusTimer);
     clearTimeout(this.paddleBonusTimer);
-    clearTimeout(this.ruleBonusTimer);      // 🟢 NEW
+    clearTimeout(this.ruleBonusTimer); 
     this.speedBonusExpiry = 0;
     this.paddleBonusExpiry = 0;
-    this.ruleBonusExpiry = 0;             // 🟢 NEW
+    this.ruleBonusExpiry = 0;   
     this.paddle.w = BASE_PADDLE_W;
     this.paddle.x = CANVAS_W / 2 - BASE_PADDLE_W / 2;
     this.paddle.prevX = this.paddle.x;
@@ -591,7 +589,7 @@ export class GameComponent implements AfterViewInit, OnDestroy {
           case 'speed': color = '#f97316'; break;
           case 'paddle': color = '#3b82f6'; break;
           case 'score': color = '#d946ef'; break;
-          case 'rule': color = '#ec4899'; break; // 🟢 NEW: Pink/Magenta for Rule
+          case 'rule': color = '#ec4899'; break;
           default: color = '#22c55e';
         }
         ctx.fillStyle = color;
@@ -638,9 +636,8 @@ export class GameComponent implements AfterViewInit, OnDestroy {
       ctx.fillRect(bX, bY, bW * frac, bH);
       ctx.fillStyle = '#3b82f6';
       ctx.fillText('🏓 ' + rem + 's', x, y);
-      y += 18; // Fixed missing increment from original code
+      y += 18;
     }
-    // 🟢 NEW: Rule the Ball Timer
     if (this.ruleBonusExpiry > now) {
       const rem = ((this.ruleBonusExpiry - now) / 1000).toFixed(1);
       const frac = (this.ruleBonusExpiry - now) / BONUS_DURATION_MS;
